@@ -29,6 +29,18 @@ module TpToGithub
       JSON.parse(response.body)
     end
 
+    def add_sub_issue(parent_issue_number:, child_issue_id:)
+      response = connection.post("/repos/#{@repo}/issues/#{parent_issue_number}/sub_issues") do |req|
+        req.body = JSON.generate({ sub_issue_id: child_issue_id })
+      end
+
+      unless response.success?
+        raise Error, "GitHub add sub-issue failed (status=#{response.status}): #{response.body}"
+      end
+
+      true
+    end
+
     private
 
     def validate!

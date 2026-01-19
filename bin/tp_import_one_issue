@@ -5,6 +5,8 @@ require "json"
 
 require_relative "../lib/tp_to_github"
 
+dry_run = ENV["DRY_RUN"] == "1"
+
 story_id = Integer(ENV.fetch("TP_STORY_ID"), 10)
 base_url = ENV.fetch("TP_BASE_URL", "")
 username = ENV.fetch("TP_USERNAME", "")
@@ -20,18 +22,68 @@ github = TpToGithub::GitHubClient.new(access_token:, repo:)
 normalizer = TpToGithub::StoryNormalizer.new(base_url:)
 
 story = tp.user_story(id: story_id)
-normalized = normalizer.normalize(story)
+tasks = tp.tasks_for_user_story(story_id:, team_id:)
 
-title = normalized.fetch("name")
-body = normalized.fetch("description_markdown")
+project_id = story.dig("Project", "Id")
+feature_id = story.dig("Feature", "Id")
+raise "Story is missing Project.Id" if project_id.nil?
+raise "Story is missing Feature.Id" if feature_id.nil?
 
-created = github.create_issue(title:, body:)
+feature = tp.feature(id: feature_id)
+epic_id = feature.dig("Epic", "Id")
+raise "Feature is missing Epic.Id" if epic_id.nil?
+
+epic = tp.epic(id: epic_id)
+project = tp.project(id: project_id)
+
+normalized_story = normalizer.normalize(story, tasks:)
+
+plan = {
+  "dry_run" => dry_run,
+  "tp" => {
+    "project" => { "id" => project_id, "name" => project["Name"] },
+    "epic" => { "id" => epic_id, "name" => epic["Name"] },
+    "feature" => { "id" => feature_id, "name" => feature["Name"] },
+    "story" => { "id" => story_id, "name" => story["Name"], "task_count" => tasks.length }
+  },
+  "github" => {
+    "repo" => repo,
+    "actions" => []
+  }
+}
+
+if dry_run
+  plan["github"]["actions"] = [
+    { "create_issue" => "Project: #{project["Name"]}" },
+    { "create_issue" => "Epic: #{epic["Name"]}" },
+    { "add_sub_issue" => "Project -> Epic" },
+    { "create_issue" => "Feature: #{feature["Name"]}" },
+    { "add_sub_issue" => "Epic -> Feature" },
+    { "create_issue" => "Story: #{story["Name"]}" },
+    { "add_sub_issue" => "Feature -> Story" }
+  ]
+
+  puts JSON.pretty_generate(plan)
+  exit 0
+end
+
+project_issue = github.create_issue(title: "Project: #{project.fetch("Name")}", body: "")
+epic_issue = github.create_issue(title: "Epic: #{epic.fetch("Name")}", body: "")
+github.add_sub_issue(parent_issue_number: project_issue.fetch("number"), child_issue_id: epic_issue.fetch("id"))
+
+feature_issue = github.create_issue(title: "Feature: #{feature.fetch("Name")}", body: "")
+github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id"))
+
+story_issue = github.create_issue(title: normalized_story.fetch("name"), body: normalized_story.fetch("description_markdown"))
+github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id"))
 
 result = {
   "tp_story_id" => story_id,
-  "github_issue_number" => created["number"],
-  "github_issue_url" => created["html_url"],
-  "tp_team_id" => team_id
+  "tp_team_id" => team_id,
+  "github_project_issue" => { "number" => project_issue["number"], "url" => project_issue["html_url"] },
+  "github_epic_issue" => { "number" => epic_issue["number"], "url" => epic_issue["html_url"] },
+  "github_feature_issue" => { "number" => feature_issue["number"], "url" => feature_issue["html_url"] },
+  "github_story_issue" => { "number" => story_issue["number"], "url" => story_issue["html_url"] }
 }
 
 puts JSON.pretty_generate(result)

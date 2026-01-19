@@ -13,11 +13,11 @@ RSpec.describe TpToGithub::TargetProcessClient do
     base_url = "https://example.tpondemand.com"
 
     stub_request(:get, "#{base_url}/api/v1/UserStories/36406")
-      .with(query: { "select" => "Id,Name,Description" })
+      .with(query: { "select" => "Id,Name,Description,Project.Id,Feature.Id" })
       .to_return(
         status: 200,
         headers: { "Content-Type" => "application/json" },
-        body: JSON.generate({ "Id" => 36_406, "Name" => "Story", "Description" => "<p>Hi</p>" })
+        body: JSON.generate({ "Id" => 36_406, "Name" => "Story", "Description" => "<p>Hi</p>", "Project" => { "Id" => 1 }, "Feature" => { "Id" => 2 } })
       )
 
     client = described_class.new(base_url:, username: "u", password: "p")

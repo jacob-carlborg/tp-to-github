@@ -3,15 +3,17 @@
 require "spec_helper"
 
 RSpec.describe TpToGithub::StoryNormalizer do
-  it "adds import note and converts description to markdown" do
+  it "adds tasks before import note" do
     story = {
       "Id" => 123,
       "Name" => "My Story",
       "Description" => "<div><p>Hello <strong>world</strong></p></div>"
     }
 
+    tasks = [{ "Name" => "Task A" }, { "Name" => "Task B" }]
+
     normalizer = described_class.new(base_url: "https://example.tpondemand.com")
-    normalized = normalizer.normalize(story)
+    normalized = normalizer.normalize(story, tasks:)
 
     expect(normalized.fetch("id")).to eql(123)
     expect(normalized.fetch("name")).to eql("My Story")
@@ -19,7 +21,11 @@ RSpec.describe TpToGithub::StoryNormalizer do
 
     expect(markdown).to include("Hello")
     expect(markdown).to include("**world**")
+    expect(markdown).to include("### Tasks\n- [ ] Task A\n- [ ] Task B")
     expect(markdown).to end_with("_Imported from TargetProcess: [#123](https://example.tpondemand.com/entity/123)_\n")
+
+    expect(markdown.index("### Tasks")).to be > markdown.index("Hello")
+    expect(markdown.index("_Imported from TargetProcess")).to be > markdown.index("### Tasks")
   end
 
   it "does not convert when description is already markdown" do

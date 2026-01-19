@@ -18,24 +18,35 @@ module TpToGithub
       @base_url = base_url
     end
 
-    def normalize(raw_story)
+    def normalize(raw_story, tasks: [])
       id = raw_story.fetch("Id")
       description_markdown = html_to_markdown(raw_story["Description"])
 
       {
         "id" => id,
         "name" => raw_story.fetch("Name"),
-        "description_markdown" => build_description(id:, description_markdown:)
+        "description_markdown" => build_description(id:, description_markdown:, tasks:)
       }
     end
 
     private
 
-    def build_description(id:, description_markdown:)
+    def build_description(id:, description_markdown:, tasks:)
       parts = []
       parts << description_markdown unless description_markdown.empty?
+
+      task_list = build_task_list(tasks)
+      parts << task_list unless task_list.empty?
+
       parts << import_note(id:)
       parts.join("\n\n") + "\n"
+    end
+
+    def build_task_list(tasks)
+      names = tasks.filter_map { |t| t["Name"]&.strip }.reject(&:empty?)
+      return "" if names.empty?
+
+      (["### Tasks"] + names.map { |name| "- [ ] #{name}" }).join("\n")
     end
 
     def import_note(id:)

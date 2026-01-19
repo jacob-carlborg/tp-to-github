@@ -62,6 +62,30 @@ module TpToGithub
 
     def user_story(id:)
       response = connection.get("/api/v1/UserStories/#{id}") do |req|
+        req.params["select"] = "Id,Name,Description,Project.Id,Feature.Id"
+      end
+
+      JSON.parse(response.body)
+    end
+
+    def project(id:)
+      response = connection.get("/api/v1/Projects/#{id}") do |req|
+        req.params["select"] = select_fields
+      end
+
+      JSON.parse(response.body)
+    end
+
+    def feature(id:)
+      response = connection.get("/api/v1/Features/#{id}") do |req|
+        req.params["select"] = "Id,Name,Description,Epic.Id,Project.Id"
+      end
+
+      JSON.parse(response.body)
+    end
+
+    def epic(id:)
+      response = connection.get("/api/v1/Epics/#{id}") do |req|
         req.params["select"] = select_fields
       end
 
