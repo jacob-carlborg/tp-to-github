@@ -41,6 +41,18 @@ module TpToGithub
       true
     end
 
+    def mute_issue(issue_number:)
+      response = connection.put("/repos/#{@repo}/issues/#{issue_number}/subscription") do |req|
+        req.body = JSON.generate({ subscribed: false, ignored: true })
+      end
+
+      unless response.success?
+        raise Error, "GitHub mute issue failed (status=#{response.status}): #{response.body}"
+      end
+
+      true
+    end
+
     private
 
     def validate!

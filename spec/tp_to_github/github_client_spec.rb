@@ -50,4 +50,22 @@ RSpec.describe TpToGithub::GitHubClient do
 
     expect(client.add_sub_issue(parent_issue_number: 10, child_issue_id: 999)).to be(true)
   end
+
+  it "mutes an issue" do
+    stub_request(:put, "https://api.github.com/repos/octo-org/octo-repo/issues/10/subscription")
+      .with(
+        body: { subscribed: false, ignored: true }.to_json,
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(status: 200, body: "{}")
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    expect(client.mute_issue(issue_number: 10)).to be(true)
+  end
 end

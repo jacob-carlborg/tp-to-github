@@ -70,23 +70,41 @@ if dry_run
   exit 0
 end
 
-project_issue = github.create_issue(title: normalized_project.fetch("name"), body: normalized_project.fetch("description_markdown"))
-epic_issue = github.create_issue(title: normalized_epic.fetch("name"), body: normalized_epic.fetch("description_markdown"))
-github.add_sub_issue(parent_issue_number: project_issue.fetch("number"), child_issue_id: epic_issue.fetch("id"))
+created_issues = []
 
-feature_issue = github.create_issue(title: normalized_feature.fetch("name"), body: normalized_feature.fetch("description_markdown"))
-github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id"))
+begin
+  project_issue = github.create_issue(title: normalized_project.fetch("name"), body: normalized_project.fetch("description_markdown"))
+  created_issues << project_issue
 
-story_issue = github.create_issue(title: normalized_story.fetch("name"), body: normalized_story.fetch("description_markdown"))
-github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id"))
+  epic_issue = github.create_issue(title: normalized_epic.fetch("name"), body: normalized_epic.fetch("description_markdown"))
+  created_issues << epic_issue
 
-result = {
-  "tp_story_id" => story_id,
-  "tp_team_id" => team_id,
-  "github_project_issue" => { "number" => project_issue["number"], "url" => project_issue["html_url"] },
-  "github_epic_issue" => { "number" => epic_issue["number"], "url" => epic_issue["html_url"] },
-  "github_feature_issue" => { "number" => feature_issue["number"], "url" => feature_issue["html_url"] },
-  "github_story_issue" => { "number" => story_issue["number"], "url" => story_issue["html_url"] }
-}
+  github.add_sub_issue(parent_issue_number: project_issue.fetch("number"), child_issue_id: epic_issue.fetch("id"))
 
-puts JSON.pretty_generate(result)
+  feature_issue = github.create_issue(title: normalized_feature.fetch("name"), body: normalized_feature.fetch("description_markdown"))
+  created_issues << feature_issue
+
+  github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id"))
+
+  story_issue = github.create_issue(title: normalized_story.fetch("name"), body: normalized_story.fetch("description_markdown"))
+  created_issues << story_issue
+
+  github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id"))
+
+  result = {
+    "tp_story_id" => story_id,
+    "tp_team_id" => team_id,
+    "github_project_issue" => { "number" => project_issue["number"], "url" => project_issue["html_url"] },
+    "github_epic_issue" => { "number" => epic_issue["number"], "url" => epic_issue["html_url"] },
+    "github_feature_issue" => { "number" => feature_issue["number"], "url" => feature_issue["html_url"] },
+    "github_story_issue" => { "number" => story_issue["number"], "url" => story_issue["html_url"] }
+  }
+
+  puts JSON.pretty_generate(result)
+ensure
+  created_issues.each do |issue|
+    github.mute_issue(issue_number: issue.fetch("number"))
+  rescue TpToGithub::GitHubClient::Error
+    nil
+  end
+end
