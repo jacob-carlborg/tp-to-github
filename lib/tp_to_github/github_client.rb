@@ -36,11 +36,15 @@ module TpToGithub
         req.body = JSON.generate({ sub_issue_id: child_issue_id })
       end
 
-      unless response.success?
-        raise Error, "GitHub add sub-issue failed (status=#{response.status}): #{response.body}"
+      if response.success?
+        return true
       end
 
-      true
+      if response.status == 422 && duplicate_or_has_parent_error?(response.body)
+        return false
+      end
+
+      raise Error, "GitHub add sub-issue failed (status=#{response.status}): #{response.body}"
     end
 
     def mute_issue(issue_number:)
@@ -74,6 +78,15 @@ module TpToGithub
     end
 
     private
+
+    def duplicate_or_has_parent_error?(response_body)
+      body = JSON.parse(response_body)
+      message = body["message"].to_s
+
+      message.include?("duplicate sub-issues") || message.include?("only have one parent")
+    rescue JSON::ParserError
+      false
+    end
 
     def validate!
       raise Error, "GITHUB_ACCESS_TOKEN is required" if @access_token.to_s.strip.empty?

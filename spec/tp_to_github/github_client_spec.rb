@@ -51,6 +51,19 @@ RSpec.describe TpToGithub::GitHubClient do
     expect(client.add_sub_issue(parent_issue_number: 10, child_issue_id: 999)).to be(true)
   end
 
+  it "returns false when sub-issue already linked" do
+    stub_request(:post, "https://api.github.com/repos/octo-org/octo-repo/issues/10/sub_issues")
+      .to_return(
+        status: 422,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "message" => "An error occurred while adding the sub-issue to the parent issue. Issue may not contain duplicate sub-issues and Sub issue may only have one parent" })
+      )
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    expect(client.add_sub_issue(parent_issue_number: 10, child_issue_id: 999)).to be(false)
+  end
+
   it "mutes an issue" do
     stub_request(:put, "https://api.github.com/repos/octo-org/octo-repo/issues/10/subscription")
       .with(
