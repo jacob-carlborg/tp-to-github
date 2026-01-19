@@ -26,7 +26,7 @@ module TpToGithub
 
       loop do
         response = connection.get("/api/v1/UserStories") do |req|
-          req.params["where"] = "Team.Id eq #{team_id}"
+          req.params["where"] = "Team.Id eq #{team_id} and EntityState.Name ne 'Done'"
           req.params["select"] = "Id,Name,Description"
           req.params["take"] = take
           req.params["skip"] = skip

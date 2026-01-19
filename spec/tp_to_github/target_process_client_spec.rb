@@ -23,12 +23,12 @@ RSpec.describe TpToGithub::TargetProcessClient do
 
   it "fetches team user stories with pagination" do
     base_url = "https://example.tpondemand.com"
-    team_id = 35_411
+    team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
 
     stub_request(:get, "#{base_url}/api/v1/UserStories")
       .with(
         query: {
-          "where" => "Team.Id eq #{team_id}",
+          "where" => "Team.Id eq #{team_id} and EntityState.Name ne 'Done'",
           "select" => "Id,Name,Description",
           "take" => "2",
           "skip" => "0"
@@ -43,7 +43,7 @@ RSpec.describe TpToGithub::TargetProcessClient do
     stub_request(:get, "#{base_url}/api/v1/UserStories")
       .with(
         query: {
-          "where" => "Team.Id eq #{team_id}",
+          "where" => "Team.Id eq #{team_id} and EntityState.Name ne 'Done'",
           "select" => "Id,Name,Description",
           "take" => "2",
           "skip" => "2"

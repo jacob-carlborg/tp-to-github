@@ -1,0 +1,19 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+require_relative "../lib/tp_to_github"
+
+team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
+base_url = ENV.fetch("TP_BASE_URL", "")
+username = ENV.fetch("TP_USERNAME", "")
+password = ENV.fetch("TP_PASSWORD", "")
+
+client = TpToGithub::TargetProcessClient.new(base_url:, username:, password:)
+normalizer = TpToGithub::StoryNormalizer.new
+
+stories = client.user_stories(team_id:)
+normalized = stories.map { |s| normalizer.normalize(s) }
+
+puts JSON.pretty_generate(normalized)
