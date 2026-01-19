@@ -22,6 +22,21 @@ RSpec.describe TpToGithub::StoryNormalizer do
     expect(markdown).to end_with("_Imported from TargetProcess: [#123](https://example.tpondemand.com/entity/123)_\n")
   end
 
+  it "does not convert when description is already markdown" do
+    story = {
+      "Id" => 999,
+      "Name" => "Already MD",
+      "Description" => "<!--markdown--># Title\n\n- item"
+    }
+
+    normalizer = described_class.new(base_url: "https://example.tpondemand.com")
+    normalized = normalizer.normalize(story)
+
+    markdown = normalized.fetch("description_markdown")
+    expect(markdown).to include("# Title")
+    expect(markdown).to include("- item")
+  end
+
   it "still includes import note with missing description" do
     story = { "Id" => 1, "Name" => "No desc", "Description" => nil }
 

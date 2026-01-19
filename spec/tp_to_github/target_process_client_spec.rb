@@ -21,7 +21,7 @@ RSpec.describe TpToGithub::TargetProcessClient do
     end.to raise_error(TpToGithub::ConfigError, /TP_BASE_URL is not a valid URL/)
   end
 
-  it "fetches team user stories with pagination" do
+  it "fetches team user stories with pagination (excluding Done)" do
     base_url = "https://example.tpondemand.com"
     team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
 

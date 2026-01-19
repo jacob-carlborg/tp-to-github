@@ -44,7 +44,14 @@ module TpToGithub
     def html_to_markdown(html)
       return "" if html.nil? || html.strip.empty?
 
+      stripped = html.lstrip
+      return strip_markdown_marker(stripped) if stripped.start_with?("<!--markdown-->")
+
       ReverseMarkdown.convert(html)
+    end
+
+    def strip_markdown_marker(text)
+      text.sub(/\A\s*<!--markdown-->\s*/m, "")
     end
   end
 end

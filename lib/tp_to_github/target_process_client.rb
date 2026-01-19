@@ -45,6 +45,14 @@ module TpToGithub
       stories
     end
 
+    def user_story(id:)
+      response = connection.get("/api/v1/UserStories/#{id}") do |req|
+        req.params["select"] = "Id,Name,Description"
+      end
+
+      JSON.parse(response.body)
+    end
+
     private
 
     def validate!

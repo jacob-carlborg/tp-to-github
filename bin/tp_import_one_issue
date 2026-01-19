@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+require_relative "../lib/tp_to_github"
+
+story_id = Integer(ENV.fetch("TP_STORY_ID"), 10)
+base_url = ENV.fetch("TP_BASE_URL", "")
+username = ENV.fetch("TP_USERNAME", "")
+password = ENV.fetch("TP_PASSWORD", "")
+
+repo = ENV.fetch("GITHUB_REPO")
+access_token = ENV.fetch("GITHUB_ACCESS_TOKEN")
+
+team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
+
+tp = TpToGithub::TargetProcessClient.new(base_url:, username:, password:)
+github = TpToGithub::GitHubClient.new(access_token:, repo:)
+normalizer = TpToGithub::StoryNormalizer.new(base_url:)
+
+story = tp.user_story(id: story_id)
+normalized = normalizer.normalize(story)
+
+title = normalized.fetch("name")
+body = normalized.fetch("description_markdown")
+
+created = github.create_issue(title:, body:)
+
+result = {
+  "tp_story_id" => story_id,
+  "github_issue_number" => created["number"],
+  "github_issue_url" => created["html_url"],
+  "tp_team_id" => team_id
+}
+
+puts JSON.pretty_generate(result)
