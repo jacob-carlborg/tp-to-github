@@ -3,6 +3,16 @@
 require "reverse_markdown"
 
 module TpToGithub
+  module ReverseMarkdownConverters
+    class Div < ReverseMarkdown::Converters::Base
+      def convert(node, state = {})
+        treat_children(node, state)
+      end
+    end
+  end
+
+  ReverseMarkdown::Converters.register :div, ReverseMarkdownConverters::Div.new
+
   class StoryNormalizer
     def initialize(base_url: ENV.fetch("TP_BASE_URL", ""))
       @base_url = base_url

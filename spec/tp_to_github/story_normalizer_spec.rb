@@ -7,7 +7,7 @@ RSpec.describe TpToGithub::StoryNormalizer do
     story = {
       "Id" => 123,
       "Name" => "My Story",
-      "Description" => "<p>Hello <strong>world</strong></p>"
+      "Description" => "<div><p>Hello <strong>world</strong></p></div>"
     }
 
     normalizer = described_class.new(base_url: "https://example.tpondemand.com")
