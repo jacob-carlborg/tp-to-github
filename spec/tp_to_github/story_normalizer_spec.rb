@@ -43,6 +43,21 @@ RSpec.describe TpToGithub::StoryNormalizer do
     expect(markdown).to include("- item")
   end
 
+  it "normalizes a generic entity (no tasks list)" do
+    entity = {
+      "Id" => 50,
+      "Name" => "Project",
+      "Description" => "<p>Desc</p>"
+    }
+
+    normalizer = described_class.new(base_url: "https://example.tpondemand.com")
+    normalized = normalizer.normalize_entity(entity)
+
+    expect(normalized.fetch("description_markdown")).to include("Desc")
+    expect(normalized.fetch("description_markdown")).not_to include("### Tasks")
+    expect(normalized.fetch("description_markdown")).to end_with("_Imported from TargetProcess: [#50](https://example.tpondemand.com/entity/50)_\n")
+  end
+
   it "still includes import note with missing description" do
     story = { "Id" => 1, "Name" => "No desc", "Description" => nil }
 

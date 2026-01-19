@@ -29,6 +29,17 @@ module TpToGithub
       }
     end
 
+    def normalize_entity(raw_entity)
+      id = raw_entity.fetch("Id")
+      description_markdown = html_to_markdown(raw_entity["Description"])
+
+      {
+        "id" => id,
+        "name" => raw_entity.fetch("Name"),
+        "description_markdown" => build_description(id:, description_markdown:, tasks: [])
+      }
+    end
+
     private
 
     def build_description(id:, description_markdown:, tasks:)
