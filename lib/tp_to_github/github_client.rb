@@ -2,6 +2,8 @@
 
 require "json"
 
+require "cgi"
+
 require "faraday"
 
 module TpToGithub
@@ -51,6 +53,24 @@ module TpToGithub
       end
 
       true
+    end
+
+    def find_issue_by_marker(tp_type:, tp_id:)
+      marker = "<!--tp:#{tp_type}:#{tp_id}-->"
+      query = "repo:#{@repo} in:body \"#{marker}\""
+
+      response = connection.get("/search/issues") do |req|
+        req.params["q"] = query
+        req.params["per_page"] = 1
+      end
+
+      unless response.success?
+        raise Error, "GitHub issue search failed (status=#{response.status}): #{response.body}"
+      end
+
+      body = JSON.parse(response.body)
+      item = body.fetch("items", []).first
+      item
     end
 
     private

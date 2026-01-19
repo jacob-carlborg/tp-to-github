@@ -36,9 +36,9 @@ raise "Feature is missing Epic.Id" if epic_id.nil?
 epic = tp.epic(id: epic_id)
 project = tp.project(id: project_id)
 
-normalized_project = normalizer.normalize_entity(project)
-normalized_epic = normalizer.normalize_entity(epic)
-normalized_feature = normalizer.normalize_entity(feature)
+normalized_project = normalizer.normalize_entity(project, tp_type: "Project")
+normalized_epic = normalizer.normalize_entity(epic, tp_type: "Epic")
+normalized_feature = normalizer.normalize_entity(feature, tp_type: "Feature")
 normalized_story = normalizer.normalize(story, tasks:)
 
 plan = {
@@ -55,41 +55,85 @@ plan = {
   }
 }
 
-if dry_run
-  plan["github"]["actions"] = [
-    { "create_issue" => project["Name"] },
-    { "create_issue" => epic["Name"] },
-    { "add_sub_issue" => "Project -> Epic" },
-    { "create_issue" => feature["Name"] },
-    { "add_sub_issue" => "Epic -> Feature" },
-    { "create_issue" => story["Name"] },
-    { "add_sub_issue" => "Feature -> Story" }
-  ]
+def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:)
+  existing = github.find_issue_by_marker(tp_type:, tp_id:)
 
-  puts JSON.pretty_generate(plan)
-  exit 0
+  if existing
+    plan_actions << { "reuse_issue" => title }
+    return existing
+  end
+
+  plan_actions << { "create_issue" => title }
+  return { "number" => -1, "id" => -1, "html_url" => "" } if dry_run
+
+  created = github.create_issue(title:, body:)
+  created_issues << created
+  created
 end
+
+plan_actions = []
 
 created_issues = []
 
 begin
-  project_issue = github.create_issue(title: normalized_project.fetch("name"), body: normalized_project.fetch("description_markdown"))
-  created_issues << project_issue
+  project_issue = create_or_find_issue(
+    github:,
+    tp_type: "Project",
+    tp_id: project_id,
+    title: normalized_project.fetch("name"),
+    body: normalized_project.fetch("description_markdown"),
+    created_issues:,
+    plan_actions:,
+    dry_run:
+  )
 
-  epic_issue = github.create_issue(title: normalized_epic.fetch("name"), body: normalized_epic.fetch("description_markdown"))
-  created_issues << epic_issue
+  epic_issue = create_or_find_issue(
+    github:,
+    tp_type: "Epic",
+    tp_id: epic_id,
+    title: normalized_epic.fetch("name"),
+    body: normalized_epic.fetch("description_markdown"),
+    created_issues:,
+    plan_actions:,
+    dry_run:
+  )
 
-  github.add_sub_issue(parent_issue_number: project_issue.fetch("number"), child_issue_id: epic_issue.fetch("id"))
+  plan_actions << { "add_sub_issue" => "Project -> Epic" }
+  github.add_sub_issue(parent_issue_number: project_issue.fetch("number"), child_issue_id: epic_issue.fetch("id")) unless dry_run
 
-  feature_issue = github.create_issue(title: normalized_feature.fetch("name"), body: normalized_feature.fetch("description_markdown"))
-  created_issues << feature_issue
+  feature_issue = create_or_find_issue(
+    github:,
+    tp_type: "Feature",
+    tp_id: feature_id,
+    title: normalized_feature.fetch("name"),
+    body: normalized_feature.fetch("description_markdown"),
+    created_issues:,
+    plan_actions:,
+    dry_run:
+  )
 
-  github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id"))
+  plan_actions << { "add_sub_issue" => "Epic -> Feature" }
+  github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id")) unless dry_run
 
-  story_issue = github.create_issue(title: normalized_story.fetch("name"), body: normalized_story.fetch("description_markdown"))
-  created_issues << story_issue
+  story_issue = create_or_find_issue(
+    github:,
+    tp_type: "UserStory",
+    tp_id: story_id,
+    title: normalized_story.fetch("name"),
+    body: normalized_story.fetch("description_markdown"),
+    created_issues:,
+    plan_actions:,
+    dry_run:
+  )
 
-  github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id"))
+  plan_actions << { "add_sub_issue" => "Feature -> Story" }
+  github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id")) unless dry_run
+
+  if dry_run
+    plan["github"]["actions"] = plan_actions
+    puts JSON.pretty_generate(plan)
+    exit 0
+  end
 
   result = {
     "tp_story_id" => story_id,

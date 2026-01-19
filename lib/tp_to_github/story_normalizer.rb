@@ -25,24 +25,34 @@ module TpToGithub
       {
         "id" => id,
         "name" => raw_story.fetch("Name"),
-        "description_markdown" => build_description(id:, description_markdown:, tasks:)
+        "description_markdown" => build_description(
+          tp_type: "UserStory",
+          id:,
+          description_markdown:,
+          tasks:
+        )
       }
     end
 
-    def normalize_entity(raw_entity)
+    def normalize_entity(raw_entity, tp_type:)
       id = raw_entity.fetch("Id")
       description_markdown = html_to_markdown(raw_entity["Description"])
 
       {
         "id" => id,
         "name" => raw_entity.fetch("Name"),
-        "description_markdown" => build_description(id:, description_markdown:, tasks: [])
+        "description_markdown" => build_description(
+          tp_type:,
+          id:,
+          description_markdown:,
+          tasks: []
+        )
       }
     end
 
     private
 
-    def build_description(id:, description_markdown:, tasks:)
+    def build_description(tp_type:, id:, description_markdown:, tasks:)
       parts = []
       parts << description_markdown unless description_markdown.empty?
 
@@ -50,7 +60,13 @@ module TpToGithub
       parts << task_list unless task_list.empty?
 
       parts << import_note(id:)
+      parts << tp_marker(tp_type:, id:)
+
       parts.join("\n\n") + "\n"
+    end
+
+    def tp_marker(tp_type:, id:)
+      "<!--tp:#{tp_type}:#{id}-->"
     end
 
     def build_task_list(tasks)

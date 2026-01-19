@@ -68,4 +68,31 @@ RSpec.describe TpToGithub::GitHubClient do
 
     expect(client.mute_issue(issue_number: 10)).to be(true)
   end
+
+  it "finds an issue by TP marker" do
+    stub_request(:get, "https://api.github.com/search/issues")
+      .with(
+        query: {
+          "q" => "repo:octo-org/octo-repo in:body \"<!--tp:Project:35256-->\"",
+          "per_page" => "1"
+        },
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "items" => [{ "number" => 1, "id" => 99 }] })
+      )
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    found = client.find_issue_by_marker(tp_type: "Project", tp_id: 35_256)
+
+    expect(found.fetch("id")).to eql(99)
+  end
 end

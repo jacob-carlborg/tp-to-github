@@ -22,7 +22,8 @@ RSpec.describe TpToGithub::StoryNormalizer do
     expect(markdown).to include("Hello")
     expect(markdown).to include("**world**")
     expect(markdown).to include("### Tasks\n- [ ] Task A\n- [ ] Task B")
-    expect(markdown).to end_with("_Imported from TargetProcess: [#123](https://example.tpondemand.com/entity/123)_\n")
+    expect(markdown).to include("<!--tp:UserStory:123-->")
+    expect(markdown).to end_with("<!--tp:UserStory:123-->\n")
 
     expect(markdown.index("### Tasks")).to be > markdown.index("Hello")
     expect(markdown.index("_Imported from TargetProcess")).to be > markdown.index("### Tasks")
@@ -51,11 +52,12 @@ RSpec.describe TpToGithub::StoryNormalizer do
     }
 
     normalizer = described_class.new(base_url: "https://example.tpondemand.com")
-    normalized = normalizer.normalize_entity(entity)
+    normalized = normalizer.normalize_entity(entity, tp_type: "Project")
 
     expect(normalized.fetch("description_markdown")).to include("Desc")
     expect(normalized.fetch("description_markdown")).not_to include("### Tasks")
-    expect(normalized.fetch("description_markdown")).to end_with("_Imported from TargetProcess: [#50](https://example.tpondemand.com/entity/50)_\n")
+    expect(normalized.fetch("description_markdown")).to include("<!--tp:Project:50-->")
+    expect(normalized.fetch("description_markdown")).to end_with("<!--tp:Project:50-->\n")
   end
 
   it "still includes import note with missing description" do
@@ -65,5 +67,6 @@ RSpec.describe TpToGithub::StoryNormalizer do
     normalized = normalizer.normalize(story)
 
     expect(normalized.fetch("description_markdown")).to include("https://example.tpondemand.com/entity/1")
+    expect(normalized.fetch("description_markdown")).to include("<!--tp:UserStory:1-->")
   end
 end
