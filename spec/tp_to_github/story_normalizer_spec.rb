@@ -3,26 +3,31 @@
 require "spec_helper"
 
 RSpec.describe TpToGithub::StoryNormalizer do
-  it "normalizes id, name, and converts description to markdown" do
+  it "adds import note and converts description to markdown" do
     story = {
       "Id" => 123,
       "Name" => "My Story",
       "Description" => "<p>Hello <strong>world</strong></p>"
     }
 
-    normalized = described_class.new.normalize(story)
+    normalizer = described_class.new(base_url: "https://example.tpondemand.com")
+    normalized = normalizer.normalize(story)
 
     expect(normalized.fetch("id")).to eql(123)
     expect(normalized.fetch("name")).to eql("My Story")
-    expect(normalized.fetch("description_markdown")).to include("Hello")
-    expect(normalized.fetch("description_markdown")).to include("**world**")
+    markdown = normalized.fetch("description_markdown")
+
+    expect(markdown).to include("Hello")
+    expect(markdown).to include("**world**")
+    expect(markdown).to end_with("_Imported from TargetProcess: [#123](https://example.tpondemand.com/entity/123)_\n")
   end
 
-  it "handles missing description" do
+  it "still includes import note with missing description" do
     story = { "Id" => 1, "Name" => "No desc", "Description" => nil }
 
-    normalized = described_class.new.normalize(story)
+    normalizer = described_class.new(base_url: "https://example.tpondemand.com")
+    normalized = normalizer.normalize(story)
 
-    expect(normalized.fetch("description_markdown")).to eql("")
+    expect(normalized.fetch("description_markdown")).to include("https://example.tpondemand.com/entity/1")
   end
 end
