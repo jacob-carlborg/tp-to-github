@@ -20,9 +20,11 @@ module TpToGithub
       validate!
     end
 
-    def create_issue(title:, body:)
+    def create_issue(title:, body:, type: nil)
+      payload = { title: title, body: body }
+      payload[:type] = type if type
       response = connection.post("/repos/#{@repo}/issues") do |req|
-        req.body = JSON.generate({ title:, body: })
+        req.body = JSON.generate(payload)
       end
 
       unless response.success?

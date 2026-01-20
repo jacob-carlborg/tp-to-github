@@ -86,6 +86,16 @@ plan = {
   }
 }
 
+def tp_to_github_issue_type(tp_type)
+  case tp_type
+  when "UserStory" then "Story"
+  when "Epic" then "Epic"
+  when "Feature" then "Feature"
+  when "Project" then "Project"
+  else nil # Or raise/warn as needed
+  end
+end
+
 def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:, project_client: nil, project_node_id: nil, org: nil, repo: nil)
   if idempotent
     existing = github.find_issue_by_marker(tp_type:, tp_id:)
@@ -99,7 +109,8 @@ def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issue
   plan_actions << { "create_issue" => title }
   return { "number" => -1, "id" => -1, "html_url" => "" } if dry_run
 
-  created = github.create_issue(title:, body:)
+  issue_type = tp_to_github_issue_type(tp_type)
+  created = github.create_issue(title: title, body: body, type: issue_type)
   created_issues << created
 
   # Add to GitHub Project v2 if requested
