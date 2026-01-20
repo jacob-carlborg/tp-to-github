@@ -12,6 +12,17 @@ raw_idempotent = ENV.key?("IDEMPOTENT") ? ENV.fetch("IDEMPOTENT") : ENV.fetch("I
 
 idempotent = raw_idempotent != "0"
 
+project_name = ENV["GITHUB_PROJECT_NAME"]
+org = repo.split("/").first if repo.include?("/")
+project_client = nil
+project_node_id = nil
+if project_name && org
+  project_client = TpToGithub::GitHubProjectClient.new(access_token:, org: org)
+  unless dry_run
+    project_node_id = project_client.project_node_id_by_name(project_name)
+  end
+end
+
 story_id = Integer(ENV.fetch("TP_STORY_ID"), 10)
 base_url = ENV.fetch("TP_BASE_URL", "")
 username = ENV.fetch("TP_USERNAME", "")
@@ -19,6 +30,9 @@ password = ENV.fetch("TP_PASSWORD", "")
 
 repo = ENV.fetch("GITHUB_REPO")
 access_token = ENV.fetch("GITHUB_ACCESS_TOKEN")
+project_name = ENV["GITHUB_PROJECT_NAME"]
+
+org = repo.split("/").first if repo.include?("/")
 
 team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
 
@@ -69,7 +83,7 @@ plan = {
   }
 }
 
-def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:)
+def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:, project_client: nil, project_node_id: nil, org: nil, repo: nil)
   if idempotent
     existing = github.find_issue_by_marker(tp_type:, tp_id:)
 
@@ -84,6 +98,21 @@ def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issue
 
   created = github.create_issue(title:, body:)
   created_issues << created
+
+  # Add to GitHub Project v2 if requested
+  if project_client && project_node_id && org && repo
+    begin
+      issue_number = created["number"]
+      repo_name = repo.split("/").last
+      issue_node = project_client.issue_node_id(owner: org, repo: repo_name, number: issue_number)
+      project_client.add_item_to_project(project_node_id: project_node_id, issue_node_id: issue_node)
+      plan_actions << { "add_to_project_v2" => title }
+    rescue => e
+      plan_actions << { "add_to_project_v2_error" => { "title" => title, "error" => e.message } }
+      warn "[tp-to-github] Failed to add issue to project: #{e.message}"
+    end
+  end
+
   created
 end
 
@@ -101,7 +130,11 @@ begin
     created_issues:,
     plan_actions:,
     dry_run:,
-    idempotent:
+    idempotent:,
+    project_client: project_client,
+    project_node_id: project_node_id,
+    org: org,
+    repo: repo
   )
 
   epic_issue = create_or_find_issue(
@@ -113,7 +146,11 @@ begin
     created_issues:,
     plan_actions:,
     dry_run:,
-    idempotent:
+    idempotent:,
+    project_client: project_client,
+    project_node_id: project_node_id,
+    org: org,
+    repo: repo
   )
 
   plan_actions << { "add_sub_issue" => "Project -> Epic" }
@@ -128,7 +165,11 @@ begin
     created_issues:,
     plan_actions:,
     dry_run:,
-    idempotent:
+    idempotent:,
+    project_client: project_client,
+    project_node_id: project_node_id,
+    org: org,
+    repo: repo
   )
 
   plan_actions << { "add_sub_issue" => "Epic -> Feature" }
@@ -143,7 +184,11 @@ begin
     created_issues:,
     plan_actions:,
     dry_run:,
-    idempotent:
+    idempotent:,
+    project_client: project_client,
+    project_node_id: project_node_id,
+    org: org,
+    repo: repo
   )
 
   plan_actions << { "add_sub_issue" => "Feature -> Story" }
