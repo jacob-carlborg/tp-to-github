@@ -240,6 +240,55 @@ begin
   plan_actions << { "add_sub_issue" => "Feature -> Story" }
   github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id")) unless dry_run
 
+  # --- Set Status field on project item for story ---
+  entity_state_hash = story["EntityState"]
+  tp_status = entity_state_hash.is_a?(Hash) ? entity_state_hash["Name"].to_s.strip : entity_state_hash.to_s.strip
+  STATUS_MAPPING = {
+    "Open" => "Todo",
+    "Specified" => "Todo",
+    "Estimated" => "Todo",
+    "Planned" => "Todo",
+    "In Progress" => "In progress",
+    "In Testing" => "In testing",
+    "Awaiting Release" => "Awaiting release",
+    "Done" => "Done",
+    "Code Review" => "Code review"
+  }
+  STATUS_OPTION_IDS = {
+    "Todo" => "f75ad846",
+    "In progress" => "47fc9ee4",
+    "Done" => "98236657",
+    "Code review" => "a4051e5a",
+    "In testing" => "0c22238e",
+    "Awaiting release" => "6b80231a"
+  }
+  github_status = STATUS_MAPPING[tp_status]
+  raise "Unknown or unmapped EntityState: #{tp_status.inspect}" unless github_status
+  option_id = STATUS_OPTION_IDS[github_status]
+  raise "No option ID for status #{github_status.inspect}" unless option_id
+
+  if project_client && project_node_id && org && repo
+    repo_name = repo.split("/").last
+    issue_node = project_client.issue_node_id(owner: org, repo: repo_name, number: story_issue["number"])
+    item_id = story_issue["project_item_id"]
+    unless item_id
+      warn "DEBUG: No project_item_id stored; falling back to find_project_item_id"
+      item_id = project_client.find_project_item_id(project_node_id: project_node_id, issue_node_id: issue_node)
+    end
+    raise "Could not determine project item id for story" unless item_id
+    fields = project_client.project_fields(project_node_id: project_node_id)
+    warn "DEBUG: All project field names and their raw objects:"
+    fields.each { |f| warn "[#{f['name']}] #{f.inspect}" }
+    status_field = fields.find { |f| f["name"] == "Status" }
+    unless status_field
+      raise "Project 'Status' field not found"
+    end
+    require 'pp'; pp status_field
+    # Use known option ID mapping for Status
+    project_client.set_status_field(project_node_id: project_node_id, item_id: item_id, field_id: status_field["id"], option_id: option_id)
+    plan_actions << { "set_status_field" => github_status }
+  end
+
   if dry_run
     plan["github"]["actions"] = plan_actions
     puts JSON.pretty_generate(plan)

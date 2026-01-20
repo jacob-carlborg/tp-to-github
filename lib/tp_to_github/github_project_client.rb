@@ -149,6 +149,26 @@ module TpToGithub
       true
     end
 
+    # Updates a single-select Status field for a specific item
+    def set_status_field(project_node_id:, item_id:, field_id:, option_id:)
+      resp = graphql(
+        query: <<~GQL,
+          mutation($project: ID!, $item: ID!, $field: ID!, $optionId: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $project, itemId: $item, fieldId: $field, value: { singleSelectOptionId: $optionId }
+            }) {
+              projectV2Item { id }
+            }
+          }
+        GQL
+        variables: { project: project_node_id, item: item_id, field: field_id, optionId: option_id }
+      )
+      unless resp.dig("data", "updateProjectV2ItemFieldValue", "projectV2Item", "id")
+        raise Error, "updateProjectV2ItemFieldValue (Status) failed: #{resp.inspect}"
+      end
+      true
+    end
+
     # Looks up issue node id from issue_number (repo-level)
     def issue_node_id(owner:, repo:, number:)
       resp = graphql(
