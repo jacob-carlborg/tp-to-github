@@ -56,7 +56,7 @@ module TpToGithub
       raise Error, "Project not found with name: #{name} in org #{@org}"
     end
 
-    # Adds an issue (by node ID) to a project v2 (by node ID)
+    # Adds an issue (by node ID) to a project v2 (by node ID) and returns item ID
     def add_item_to_project(project_node_id:, issue_node_id:)
       resp = graphql(
         query: <<~GQL,
@@ -70,6 +70,81 @@ module TpToGithub
       )
       unless resp["data"] && resp["data"]["addProjectV2ItemById"]
         raise Error, "addProjectV2ItemById failed: #{resp}"
+      end
+      resp["data"]["addProjectV2ItemById"]["item"]["id"]
+    end
+
+    # Gets all fields for the given project node ID
+    def project_fields(project_node_id:)
+      resp = graphql(
+        query: <<~GQL,
+          query($project: ID!) {
+            node(id: $project) {
+              ... on ProjectV2 {
+                fields(first: 50) {
+                  nodes {
+                    ... on ProjectV2FieldCommon {
+                      id
+                      name
+                    }
+                    ... on ProjectV2Field {
+                      dataType
+                    }
+                  }
+                }
+              }
+            }
+          }
+        GQL
+        variables: { project: project_node_id }
+      )
+      fields_arr = resp.dig("data", "node", "fields", "nodes")
+      raise Error, "Project fields not found: #{resp}" unless fields_arr
+      fields_arr
+    end
+
+    # Gets project item id for issue (issue_node_id) in the project
+    def find_project_item_id(project_node_id:, issue_node_id:)
+      resp = graphql(
+        query: <<~GQL,
+          query($project: ID!) {
+            node(id: $project) {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content { ... on Issue { id } }
+                  }
+                }
+              }
+            }
+          }
+        GQL
+        variables: { project: project_node_id }
+      )
+      items = resp.dig("data", "node", "items", "nodes")
+      raise Error, "Could not list project items: #{resp.inspect}" unless items
+      found = items.find { |item| item.dig("content", "id") == issue_node_id }
+      raise Error, "Project item for issue not found: #{issue_node_id}" unless found
+      found["id"]
+    end
+
+    # Updates a number field for a specific item
+    def set_estimate_field(project_node_id:, item_id:, field_id:, value:)
+      resp = graphql(
+        query: <<~GQL,
+          mutation($project: ID!, $item: ID!, $field: ID!, $value: Float!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $project, itemId: $item, fieldId: $field, value: { number: $value }
+            }) {
+              projectV2Item { id }
+            }
+          }
+        GQL
+        variables: { project: project_node_id, item: item_id, field: field_id, value: value.to_f }
+      )
+      unless resp.dig("data", "updateProjectV2ItemFieldValue", "projectV2Item", "id")
+        raise Error, "updateProjectV2ItemFieldValue failed: #{resp.inspect}"
       end
       true
     end
@@ -94,6 +169,7 @@ module TpToGithub
     end
 
     private
+
 
     def graphql(query:, variables: {})
       response = connection.post do |req|

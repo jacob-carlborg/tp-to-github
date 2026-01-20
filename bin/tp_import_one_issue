@@ -108,7 +108,8 @@ def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issue
       issue_number = created["number"]
       repo_name = repo.split("/").last
       issue_node = project_client.issue_node_id(owner: org, repo: repo_name, number: issue_number)
-      project_client.add_item_to_project(project_node_id: project_node_id, issue_node_id: issue_node)
+      project_item_id = project_client.add_item_to_project(project_node_id: project_node_id, issue_node_id: issue_node)
+      created["project_item_id"] = project_item_id # pass for estimate step
       plan_actions << { "add_to_project_v2" => title }
     rescue => e
       plan_actions << { "add_to_project_v2_error" => { "title" => title, "error" => e.message } }
@@ -193,6 +194,37 @@ begin
     org: org,
     repo: repo
   )
+
+  # Set Estimate field from TP Effort (if present)
+  tp_effort = story["Effort"]
+  if !tp_effort.nil? && project_client && project_node_id && org && repo
+    begin
+      repo_name = repo.split("/").last
+      issue_node = project_client.issue_node_id(owner: org, repo: repo_name, number: story_issue["number"])
+      # Use the add_to_project mutation result (should be the item_id)
+      item_id = story_issue["project_item_id"] || begin
+        # fallback if not present (should not happen for new items)
+        project_client.find_project_item_id(project_node_id: project_node_id, issue_node_id: issue_node)
+      end
+      fields = project_client.project_fields(project_node_id: project_node_id)
+      matches = fields.select { |f| f["name"] == "Estimate" && f["dataType"] == "NUMBER" }
+      if matches.empty?
+        raise "No project field named 'Estimate' of type NUMBER found"
+      elsif matches.size > 1
+        raise "Multiple 'Estimate' fields found, will not set value (ambiguous)"
+      end
+      field_id = matches.first["id"]
+      if dry_run
+        plan_actions << { "set_project_estimate" => { "item_id" => item_id, "field_id" => field_id, "value" => tp_effort } }
+      else
+        project_client.set_estimate_field(project_node_id: project_node_id, item_id: item_id, field_id: field_id, value: tp_effort)
+        plan_actions << { "set_project_estimate" => { "item_id" => item_id, "field_id" => field_id, "value" => tp_effort } }
+      end
+    rescue => e
+      plan_actions << { "set_project_estimate_error" => { "error" => e.message, "story_id" => story_id } }
+      warn "[tp-to-github] Failed to set Estimate project field: #{e.message}"
+    end
+  end
 
   plan_actions << { "add_sub_issue" => "Feature -> Story" }
   github.add_sub_issue(parent_issue_number: feature_issue.fetch("number"), child_issue_id: story_issue.fetch("id")) unless dry_run
