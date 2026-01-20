@@ -12,7 +12,10 @@ raw_idempotent = ENV.key?("IDEMPOTENT") ? ENV.fetch("IDEMPOTENT") : ENV.fetch("I
 
 idempotent = raw_idempotent != "0"
 
+repo = ENV.fetch("GITHUB_REPO")
+access_token = ENV.fetch("GITHUB_ACCESS_TOKEN")
 project_name = ENV["GITHUB_PROJECT_NAME"]
+
 org = repo.split("/").first if repo.include?("/")
 project_client = nil
 project_node_id = nil

@@ -32,9 +32,16 @@ module TpToGithub
           GQL
           variables: { org: @org, after: after }
         )
-        org = resp["data"]["organization"]
-        raise Error, "Org not found: #{@org}" unless org
-        result = org["projectsV2"]["nodes"]
+        data = resp["data"]
+        unless data
+          raise Error, "GraphQL: missing 'data' in response: #{resp.inspect}"
+        end
+        org_info = data["organization"]
+        unless org_info
+          msg = resp["errors"] ? " (errors: #{resp["errors"].map { |e| e["message"] }.join(", ")})" : ""
+          raise Error, "Org not found: #{@org}#{msg} | resp: #{resp.inspect}"
+        end
+        result = org_info["projectsV2"]["nodes"]
         matches = result.select { |n| n["title"] == name }
         if matches.size > 1
           raise Error, "Ambiguous project name: #{name.inspect} (found #{matches.size})"
@@ -42,7 +49,7 @@ module TpToGithub
           return matches.first["id"]
         end
         # else: search next page
-        page_info = org["projectsV2"]["pageInfo"]
+        page_info = org_info["projectsV2"]["pageInfo"]
         break unless page_info && page_info["hasNextPage"]
         after = page_info["endCursor"]
       end
