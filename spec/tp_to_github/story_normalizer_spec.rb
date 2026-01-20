@@ -11,7 +11,7 @@ RSpec.describe TpToGithub::StoryNormalizer do
     }
 
     tasks = [{ "Name" => "Task A" }, { "Name" => "Task B" }]
-    attachments = [{ "original_name" => "doc.pdf", "url" => "https://github.com/x/y/blob/master/tp_attachments/UserStory/123/1.pdf" }]
+    attachments = [{ "original_name" => "doc.pdf", "url" => "https://github.com/x/y/blob/main/tp_attachments/UserStory/123/1.pdf" }]
 
     normalizer = described_class.new(base_url: "https://example.tpondemand.com")
     normalized = normalizer.normalize(story, tasks:, attachments:)
@@ -23,7 +23,7 @@ RSpec.describe TpToGithub::StoryNormalizer do
     expect(markdown).to include("Hello")
     expect(markdown).to include("**world**")
     expect(markdown).to include("### Tasks\n- [ ] Task A\n- [ ] Task B")
-    expect(markdown).to include("### Attachments\n- [doc.pdf](https://github.com/x/y/blob/master/tp_attachments/UserStory/123/1.pdf)")
+    expect(markdown).to include("### Attachments\n- [doc.pdf](https://github.com/x/y/blob/main/tp_attachments/UserStory/123/1.pdf)")
     expect(markdown).to include("<!--tp:UserStory:123-->")
     expect(markdown).to end_with("<!--tp:UserStory:123-->\n")
 

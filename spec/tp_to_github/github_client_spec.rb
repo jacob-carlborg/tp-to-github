@@ -110,10 +110,31 @@ RSpec.describe TpToGithub::GitHubClient do
     expect(found.fetch("id")).to eql(99)
   end
 
+  it "fetches default branch" do
+    stub_request(:get, "https://api.github.com/repos/octo-org/octo-repo")
+      .with(
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "default_branch" => "main" })
+      )
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    expect(client.default_branch).to eql("main")
+  end
+
   it "uploads a file to the repo" do
     stub_request(:get, "https://api.github.com/repos/octo-org/octo-repo/contents/tp_attachments/UserStory/123/1.pdf")
       .with(
-        query: { "ref" => "master" },
+        query: { "ref" => "main" },
         headers: {
           "Accept" => "application/vnd.github+json",
           "Authorization" => "Bearer token",
@@ -128,7 +149,7 @@ RSpec.describe TpToGithub::GitHubClient do
         body: {
           message: "Import TP attachment UserStory#123 (1)",
           content: Base64.strict_encode64("hello"),
-          branch: "master"
+          branch: "main"
         }.to_json,
         headers: {
           "Accept" => "application/vnd.github+json",
@@ -141,13 +162,13 @@ RSpec.describe TpToGithub::GitHubClient do
 
     client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
 
-    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "master", message: "Import TP attachment UserStory#123 (1)")).to be(true)
+    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "main", message: "Import TP attachment UserStory#123 (1)")).to be(true)
   end
 
   it "skips upload when file already exists" do
     stub_request(:get, "https://api.github.com/repos/octo-org/octo-repo/contents/tp_attachments/UserStory/123/1.pdf")
       .with(
-        query: { "ref" => "master" },
+        query: { "ref" => "main" },
         headers: {
           "Accept" => "application/vnd.github+json",
           "Authorization" => "Bearer token",
@@ -159,6 +180,6 @@ RSpec.describe TpToGithub::GitHubClient do
 
     client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
 
-    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "master", message: "Import TP attachment UserStory#123 (1)")).to be(false)
+    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "main", message: "Import TP attachment UserStory#123 (1)")).to be(false)
   end
 end

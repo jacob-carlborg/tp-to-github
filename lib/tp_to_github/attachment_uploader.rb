@@ -2,13 +2,14 @@
 
 require "base64"
 
-module TpToGithub
+  module TpToGithub
   class AttachmentUploader
-    def initialize(tp_client:, github_client:, repo:, branch: "master")
+    def initialize(tp_client:, github_client:, repo:, branch: nil)
       @tp_client = tp_client
       @github_client = github_client
       @repo = repo
-      @branch = branch
+      @branch = branch || github_client.default_branch
+
 
       validate!
     end

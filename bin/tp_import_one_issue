@@ -25,7 +25,9 @@ team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
 tp = TpToGithub::TargetProcessClient.new(base_url:, username:, password:)
 github = TpToGithub::GitHubClient.new(access_token:, repo:)
 normalizer = TpToGithub::StoryNormalizer.new(base_url:)
-uploader = TpToGithub::AttachmentUploader.new(tp_client: tp, github_client: github, repo:)
+attachments_branch = ENV["GITHUB_BRANCH"]
+
+uploader = TpToGithub::AttachmentUploader.new(tp_client: tp, github_client: github, repo:, branch: attachments_branch)
 
 story = tp.user_story(id: story_id)
 tasks = tp.tasks_for_user_story(story_id:, team_id:)
