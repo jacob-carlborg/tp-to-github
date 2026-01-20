@@ -3,7 +3,7 @@
 require "spec_helper"
 
 RSpec.describe TpToGithub::StoryNormalizer do
-  it "adds tasks before import note" do
+  it "adds tasks and attachments before import note" do
     story = {
       "Id" => 123,
       "Name" => "My Story",
@@ -11,9 +11,10 @@ RSpec.describe TpToGithub::StoryNormalizer do
     }
 
     tasks = [{ "Name" => "Task A" }, { "Name" => "Task B" }]
+    attachments = [{ "original_name" => "doc.pdf", "url" => "https://github.com/x/y/blob/master/tp_attachments/UserStory/123/1.pdf" }]
 
     normalizer = described_class.new(base_url: "https://example.tpondemand.com")
-    normalized = normalizer.normalize(story, tasks:)
+    normalized = normalizer.normalize(story, tasks:, attachments:)
 
     expect(normalized.fetch("id")).to eql(123)
     expect(normalized.fetch("name")).to eql("My Story")
@@ -22,11 +23,13 @@ RSpec.describe TpToGithub::StoryNormalizer do
     expect(markdown).to include("Hello")
     expect(markdown).to include("**world**")
     expect(markdown).to include("### Tasks\n- [ ] Task A\n- [ ] Task B")
+    expect(markdown).to include("### Attachments\n- [doc.pdf](https://github.com/x/y/blob/master/tp_attachments/UserStory/123/1.pdf)")
     expect(markdown).to include("<!--tp:UserStory:123-->")
     expect(markdown).to end_with("<!--tp:UserStory:123-->\n")
 
     expect(markdown.index("### Tasks")).to be > markdown.index("Hello")
-    expect(markdown.index("_Imported from TargetProcess")).to be > markdown.index("### Tasks")
+    expect(markdown.index("### Attachments")).to be > markdown.index("### Tasks")
+    expect(markdown.index("_Imported from TargetProcess")).to be > markdown.index("### Attachments")
   end
 
   it "does not convert when description is already markdown" do

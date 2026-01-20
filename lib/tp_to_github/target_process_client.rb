@@ -92,6 +92,31 @@ module TpToGithub
       JSON.parse(response.body)
     end
 
+    def attachments_for(tp_type:, entity_id:, take: DEFAULT_TAKE)
+      where = "General.Id eq #{entity_id} and General.EntityType.Name eq '#{tp_type}'"
+
+      fetch_collection(
+        "/api/v1/Attachments",
+        where:,
+        take:
+      )
+    end
+
+    def download_attachment(attachment_id)
+      response = connection.get("/api/v1/Attachments/#{attachment_id}") do |req|
+        req.params["select"] = "UniqueFileName"
+      end
+
+      attachment = JSON.parse(response.body)
+      unique_file_name = attachment.fetch("UniqueFileName")
+
+      file_response = connection.get("/attachment.aspx") do |req|
+        req.params["filename"] = unique_file_name
+      end
+
+      file_response.body
+    end
+
     private
 
     def select_fields

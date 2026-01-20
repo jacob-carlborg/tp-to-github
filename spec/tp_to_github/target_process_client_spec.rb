@@ -226,4 +226,55 @@ RSpec.describe TpToGithub::TargetProcessClient do
 
     expect(tasks).to eql([{ "Id" => 1 }, { "Id" => 2 }])
   end
+
+  it "lists and downloads attachments for an entity" do
+    base_url = "https://example.tpondemand.com"
+
+    stub_request(:get, "#{base_url}/api/v1/Attachments")
+      .with(
+        query: {
+          "where" => "General.Id eq 123 and General.EntityType.Name eq 'UserStory'",
+          "select" => "Id,Name,Description",
+          "take" => "2",
+          "skip" => "0"
+        }
+      )
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "Items" => [{ "Id" => 1, "Name" => "doc.pdf" }] })
+      )
+
+    stub_request(:get, "#{base_url}/api/v1/Attachments")
+      .with(
+        query: {
+          "where" => "General.Id eq 123 and General.EntityType.Name eq 'UserStory'",
+          "select" => "Id,Name,Description",
+          "take" => "2",
+          "skip" => "2"
+        }
+      )
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "Items" => [] })
+      )
+
+    stub_request(:get, "#{base_url}/api/v1/Attachments/1")
+      .with(query: { "select" => "UniqueFileName" })
+      .to_return(
+        status: 200,
+        headers: { "Content-Type" => "application/json" },
+        body: JSON.generate({ "UniqueFileName" => "attachment_1.pdf" })
+      )
+
+    stub_request(:get, "#{base_url}/attachment.aspx")
+      .with(query: { "filename" => "attachment_1.pdf" })
+      .to_return(status: 200, body: "PDFDATA")
+
+    client = described_class.new(base_url:, username: "u", password: "p")
+
+    expect(client.attachments_for(tp_type: "UserStory", entity_id: 123, take: 2)).to eql([{ "Id" => 1, "Name" => "doc.pdf" }])
+    expect(client.download_attachment(1)).to eql("PDFDATA")
+  end
 end

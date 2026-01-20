@@ -5,6 +5,8 @@ source "https://rubygems.org"
 gem "faraday", "~> 2.0"
 gem "reverse_markdown", "~> 2.1"
 
+gem "base64", "~> 0.2"
+
 group :test do
   gem "rspec", "~> 3.0"
   gem "webmock", "~> 3.0"

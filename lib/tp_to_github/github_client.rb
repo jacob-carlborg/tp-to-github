@@ -3,6 +3,7 @@
 require "json"
 
 require "cgi"
+require "base64"
 
 require "faraday"
 
@@ -77,7 +78,38 @@ module TpToGithub
       item
     end
 
+    def file_exists?(path:, ref:)
+      response = connection.get("/repos/#{@repo}/contents/#{cgi_escape_path(path)}") do |req|
+        req.params["ref"] = ref
+      end
+
+      return true if response.success?
+      return false if response.status == 404
+
+      raise Error, "GitHub content lookup failed (status=#{response.status}): #{response.body}"
+    end
+
+    def upload_file(path:, content:, branch:, message:)
+      return false if file_exists?(path:, ref: branch)
+
+      base64_content = Base64.strict_encode64(content)
+
+      response = connection.put("/repos/#{@repo}/contents/#{cgi_escape_path(path)}") do |req|
+        req.body = JSON.generate({ message:, content: base64_content, branch: })
+      end
+
+      unless response.success?
+        raise Error, "GitHub upload file failed (status=#{response.status}): #{response.body}"
+      end
+
+      true
+    end
+
     private
+
+    def cgi_escape_path(path)
+      path.split("/").map { |part| CGI.escape(part) }.join("/")
+    end
 
     def duplicate_or_has_parent_error?(response_body)
       body = JSON.parse(response_body)

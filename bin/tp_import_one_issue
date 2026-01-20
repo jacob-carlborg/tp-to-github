@@ -20,6 +20,7 @@ team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
 tp = TpToGithub::TargetProcessClient.new(base_url:, username:, password:)
 github = TpToGithub::GitHubClient.new(access_token:, repo:)
 normalizer = TpToGithub::StoryNormalizer.new(base_url:)
+uploader = TpToGithub::AttachmentUploader.new(tp_client: tp, github_client: github, repo:)
 
 story = tp.user_story(id: story_id)
 tasks = tp.tasks_for_user_story(story_id:, team_id:)
@@ -36,18 +37,23 @@ raise "Feature is missing Epic.Id" if epic_id.nil?
 epic = tp.epic(id: epic_id)
 project = tp.project(id: project_id)
 
-normalized_project = normalizer.normalize_entity(project, tp_type: "Project")
-normalized_epic = normalizer.normalize_entity(epic, tp_type: "Epic")
-normalized_feature = normalizer.normalize_entity(feature, tp_type: "Feature")
-normalized_story = normalizer.normalize(story, tasks:)
+project_attachments = uploader.upload_attachments(tp_type: "Project", tp_entity_id: project_id, dry_run:)
+epic_attachments = uploader.upload_attachments(tp_type: "Epic", tp_entity_id: epic_id, dry_run:)
+feature_attachments = uploader.upload_attachments(tp_type: "Feature", tp_entity_id: feature_id, dry_run:)
+story_attachments = uploader.upload_attachments(tp_type: "UserStory", tp_entity_id: story_id, dry_run:)
+
+normalized_project = normalizer.normalize_entity(project, tp_type: "Project", attachments: project_attachments)
+normalized_epic = normalizer.normalize_entity(epic, tp_type: "Epic", attachments: epic_attachments)
+normalized_feature = normalizer.normalize_entity(feature, tp_type: "Feature", attachments: feature_attachments)
+normalized_story = normalizer.normalize(story, tasks:, attachments: story_attachments)
 
 plan = {
   "dry_run" => dry_run,
   "tp" => {
-    "project" => { "id" => project_id, "name" => project["Name"] },
-    "epic" => { "id" => epic_id, "name" => epic["Name"] },
-    "feature" => { "id" => feature_id, "name" => feature["Name"] },
-    "story" => { "id" => story_id, "name" => story["Name"], "task_count" => tasks.length }
+    "project" => { "id" => project_id, "name" => project["Name"], "attachment_count" => project_attachments.length },
+    "epic" => { "id" => epic_id, "name" => epic["Name"], "attachment_count" => epic_attachments.length },
+    "feature" => { "id" => feature_id, "name" => feature["Name"], "attachment_count" => feature_attachments.length },
+    "story" => { "id" => story_id, "name" => story["Name"], "task_count" => tasks.length, "attachment_count" => story_attachments.length }
   },
   "github" => {
     "repo" => repo,

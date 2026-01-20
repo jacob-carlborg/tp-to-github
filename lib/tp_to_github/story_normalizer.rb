@@ -18,7 +18,7 @@ module TpToGithub
       @base_url = base_url
     end
 
-    def normalize(raw_story, tasks: [])
+    def normalize(raw_story, tasks: [], attachments: [])
       id = raw_story.fetch("Id")
       description_markdown = html_to_markdown(raw_story["Description"])
 
@@ -29,12 +29,13 @@ module TpToGithub
           tp_type: "UserStory",
           id:,
           description_markdown:,
-          tasks:
+          tasks:,
+          attachments:
         )
       }
     end
 
-    def normalize_entity(raw_entity, tp_type:)
+    def normalize_entity(raw_entity, tp_type:, attachments: [])
       id = raw_entity.fetch("Id")
       description_markdown = html_to_markdown(raw_entity["Description"])
 
@@ -45,19 +46,23 @@ module TpToGithub
           tp_type:,
           id:,
           description_markdown:,
-          tasks: []
+          tasks: [],
+          attachments:
         )
       }
     end
 
     private
 
-    def build_description(tp_type:, id:, description_markdown:, tasks:)
+    def build_description(tp_type:, id:, description_markdown:, tasks:, attachments:)
       parts = []
       parts << description_markdown unless description_markdown.empty?
 
       task_list = build_task_list(tasks)
       parts << task_list unless task_list.empty?
+
+      attachments_list = build_attachments_list(attachments)
+      parts << attachments_list unless attachments_list.empty?
 
       parts << import_note(id:)
       parts << tp_marker(tp_type:, id:)
@@ -74,6 +79,20 @@ module TpToGithub
       return "" if names.empty?
 
       (["### Tasks"] + names.map { |name| "- [ ] #{name}" }).join("\n")
+    end
+
+    def build_attachments_list(attachments)
+      items = attachments.filter_map do |att|
+        name = att["original_name"].to_s.strip
+        url = att["url"].to_s.strip
+        next if name.empty? || url.empty?
+
+        "- [#{name}](#{url})"
+      end
+
+      return "" if items.empty?
+
+      (["### Attachments"] + items).join("\n")
     end
 
     def import_note(id:)

@@ -3,6 +3,7 @@
 require "spec_helper"
 
 require "webmock/rspec"
+require "base64"
 
 RSpec.describe TpToGithub::GitHubClient do
   before do
@@ -107,5 +108,57 @@ RSpec.describe TpToGithub::GitHubClient do
     found = client.find_issue_by_marker(tp_type: "Project", tp_id: 35_256)
 
     expect(found.fetch("id")).to eql(99)
+  end
+
+  it "uploads a file to the repo" do
+    stub_request(:get, "https://api.github.com/repos/octo-org/octo-repo/contents/tp_attachments/UserStory/123/1.pdf")
+      .with(
+        query: { "ref" => "master" },
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(status: 404, body: "{}")
+
+    stub_request(:put, "https://api.github.com/repos/octo-org/octo-repo/contents/tp_attachments/UserStory/123/1.pdf")
+      .with(
+        body: {
+          message: "Import TP attachment UserStory#123 (1)",
+          content: Base64.strict_encode64("hello"),
+          branch: "master"
+        }.to_json,
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(status: 201, body: "{}")
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "master", message: "Import TP attachment UserStory#123 (1)")).to be(true)
+  end
+
+  it "skips upload when file already exists" do
+    stub_request(:get, "https://api.github.com/repos/octo-org/octo-repo/contents/tp_attachments/UserStory/123/1.pdf")
+      .with(
+        query: { "ref" => "master" },
+        headers: {
+          "Accept" => "application/vnd.github+json",
+          "Authorization" => "Bearer token",
+          "Content-Type" => "application/json",
+          "X-Github-Api-Version" => "2022-11-28"
+        }
+      )
+      .to_return(status: 200, body: "{}")
+
+    client = described_class.new(access_token: "token", repo: "octo-org/octo-repo")
+
+    expect(client.upload_file(path: "tp_attachments/UserStory/123/1.pdf", content: "hello", branch: "master", message: "Import TP attachment UserStory#123 (1)")).to be(false)
   end
 end
