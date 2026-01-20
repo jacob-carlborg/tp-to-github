@@ -6,6 +6,11 @@ require "json"
 require_relative "../lib/tp_to_github"
 
 dry_run = ENV["DRY_RUN"] == "1"
+# NOTE: historically this flag was named "IDEMPOTEN" (without the trailing T).
+# Support both spellings.
+raw_idempotent = ENV.key?("IDEMPOTENT") ? ENV.fetch("IDEMPOTENT") : ENV.fetch("IDEMPOTEN", "1")
+
+idempotent = raw_idempotent != "0"
 
 story_id = Integer(ENV.fetch("TP_STORY_ID"), 10)
 base_url = ENV.fetch("TP_BASE_URL", "")
@@ -49,6 +54,7 @@ normalized_story = normalizer.normalize(story, tasks:, attachments: story_attach
 
 plan = {
   "dry_run" => dry_run,
+  "idempotent" => idempotent,
   "tp" => {
     "project" => { "id" => project_id, "name" => project["Name"], "attachment_count" => project_attachments.length },
     "epic" => { "id" => epic_id, "name" => epic["Name"], "attachment_count" => epic_attachments.length },
@@ -61,12 +67,14 @@ plan = {
   }
 }
 
-def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:)
-  existing = github.find_issue_by_marker(tp_type:, tp_id:)
+def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:)
+  if idempotent
+    existing = github.find_issue_by_marker(tp_type:, tp_id:)
 
-  if existing
-    plan_actions << { "reuse_issue" => title }
-    return existing
+    if existing
+      plan_actions << { "reuse_issue" => title }
+      return existing
+    end
   end
 
   plan_actions << { "create_issue" => title }
@@ -90,7 +98,8 @@ begin
     body: normalized_project.fetch("description_markdown"),
     created_issues:,
     plan_actions:,
-    dry_run:
+    dry_run:,
+    idempotent:
   )
 
   epic_issue = create_or_find_issue(
@@ -101,7 +110,8 @@ begin
     body: normalized_epic.fetch("description_markdown"),
     created_issues:,
     plan_actions:,
-    dry_run:
+    dry_run:,
+    idempotent:
   )
 
   plan_actions << { "add_sub_issue" => "Project -> Epic" }
@@ -115,7 +125,8 @@ begin
     body: normalized_feature.fetch("description_markdown"),
     created_issues:,
     plan_actions:,
-    dry_run:
+    dry_run:,
+    idempotent:
   )
 
   plan_actions << { "add_sub_issue" => "Epic -> Feature" }
@@ -129,7 +140,8 @@ begin
     body: normalized_story.fetch("description_markdown"),
     created_issues:,
     plan_actions:,
-    dry_run:
+    dry_run:,
+    idempotent:
   )
 
   plan_actions << { "add_sub_issue" => "Feature -> Story" }
