@@ -2,6 +2,8 @@
 
 require "json"
 require "uri"
+require "zlib"
+require "stringio"
 
 require "faraday"
 
@@ -104,17 +106,43 @@ module TpToGithub
 
     def download_attachment(attachment_id)
       response = connection.get("/api/v1/Attachments/#{attachment_id}") do |req|
-        req.params["select"] = "UniqueFileName"
+        req.params["select"] = "Id,UniqueFileName"
       end
 
       attachment = JSON.parse(response.body)
+      returned_id = attachment.fetch("Id")
       unique_file_name = attachment.fetch("UniqueFileName")
 
       file_response = connection.get("/attachment.aspx") do |req|
+        req.params["attachmentId"] = returned_id
         req.params["filename"] = unique_file_name
+
+        # Binary attachments should not be gzip-compressed; also avoids accidentally
+        # uploading gzipped JSON error payloads.
+        req.headers["Accept-Encoding"] = "identity"
+
+        if ENV["TP_DEBUG"] == "1"
+          warn "[tp-to-github] TP attachment lookup: id=#{attachment_id} -> returned_id=#{returned_id} unique_file_name=#{unique_file_name}"
+          warn "[tp-to-github] TP attachment download URL: #{@base_url}/attachment.aspx?#{URI.encode_www_form(req.params)}"
+        end
       end
 
-      file_response.body
+      body = file_response.body
+      body = body.dup.force_encoding(Encoding::BINARY) if body.is_a?(String)
+
+      # Some TP instances still return gzip despite Accept-Encoding.
+      if body&.bytesize.to_i >= 2 && body.getbyte(0) == 0x1F && body.getbyte(1) == 0x8B
+        body = Zlib::GzipReader.new(StringIO.new(body)).read
+        body = body.dup.force_encoding(Encoding::BINARY)
+      end
+
+      if ENV["TP_DEBUG"] == "1"
+        warn "[tp-to-github] TP attachment download response: status=#{file_response.status} content_type=#{file_response.headers["content-type"].inspect} bytes=#{body.to_s.bytesize}"
+        sample = body.to_s[0, 300]
+        warn "[tp-to-github] TP attachment download body sample (first 300 bytes): #{sample.inspect}"
+      end
+
+      body
     end
 
     private

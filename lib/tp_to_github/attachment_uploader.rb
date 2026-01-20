@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "base64"
+require "json"
 
   module TpToGithub
   class AttachmentUploader
@@ -35,10 +36,37 @@ require "base64"
          }
 
 
-        next if dry_run
+         next if dry_run
+
+         if ENV["TP_DEBUG"] == "1"
+           warn "[tp-to-github] Uploading attachment: tp_type=#{tp_type} tp_entity_id=#{tp_entity_id} attachment_id=#{att_id} path=#{path}"
+         end
 
          content = @tp_client.download_attachment(att_id)
+
+         if ENV["TP_DEBUG"] == "1"
+           require "digest"
+           sha = Digest::SHA256.hexdigest(content)
+           sample = content[0, 80]
+           warn "[tp-to-github] Attachment debug after download: path=#{path} sha256=#{sha} first80=#{sample.inspect}"
+         end
+
+         if content.is_a?(String)
+           stripped = content.lstrip
+           if stripped.start_with?("{")
+             begin
+               parsed = JSON.parse(stripped)
+               if parsed.is_a?(Hash) && parsed.key?("Status") && parsed.key?("Message")
+                 raise "Refusing to upload TargetProcess error payload for attachment #{att_id}: #{parsed["Message"]}"
+               end
+             rescue JSON::ParserError
+               nil
+             end
+           end
+         end
+
          @github_client.upload_file(path:, content:, branch: @branch, message: "Import TP attachment #{tp_type}##{tp_entity_id} (#{att_id})")
+
        end
 
        results

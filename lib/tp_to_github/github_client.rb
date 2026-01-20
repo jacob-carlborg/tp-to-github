@@ -102,7 +102,17 @@ module TpToGithub
     def upload_file(path:, content:, branch:, message:)
       return false if file_exists?(path:, ref: branch)
 
-      base64_content = Base64.strict_encode64(content)
+      binary_content = content
+      binary_content = binary_content.dup.force_encoding(Encoding::BINARY) if binary_content.is_a?(String)
+
+      if ENV["GITHUB_DEBUG_UPLOADS"] == "1"
+        require "digest"
+        sha = Digest::SHA256.hexdigest(binary_content)
+        sample = binary_content[0, 80]
+        warn "[tp-to-github] GITHUB upload debug path=#{path} branch=#{branch} sha256=#{sha} first80=#{sample.inspect}"
+      end
+
+      base64_content = Base64.strict_encode64(binary_content)
 
       response = connection.put("/repos/#{@repo}/contents/#{cgi_escape_path(path)}") do |req|
         req.body = JSON.generate({ message:, content: base64_content, branch: })

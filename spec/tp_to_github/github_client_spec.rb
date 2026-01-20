@@ -148,7 +148,7 @@ RSpec.describe TpToGithub::GitHubClient do
       .with(
         body: {
           message: "Import TP attachment UserStory#123 (1)",
-          content: Base64.strict_encode64("hello"),
+          content: Base64.strict_encode64("hello".dup.force_encoding(Encoding::BINARY)),
           branch: "main"
         }.to_json,
         headers: {

@@ -261,20 +261,26 @@ RSpec.describe TpToGithub::TargetProcessClient do
       )
 
     stub_request(:get, "#{base_url}/api/v1/Attachments/1")
-      .with(query: { "select" => "UniqueFileName" })
+      .with(query: { "select" => "Id,UniqueFileName" })
       .to_return(
         status: 200,
         headers: { "Content-Type" => "application/json" },
-        body: JSON.generate({ "UniqueFileName" => "attachment_1.pdf" })
+        body: JSON.generate({ "Id" => 1, "UniqueFileName" => "attachment_1.pdf" })
       )
 
     stub_request(:get, "#{base_url}/attachment.aspx")
-      .with(query: { "filename" => "attachment_1.pdf" })
+      .with(
+        query: { "attachmentId" => "1", "filename" => "attachment_1.pdf" },
+        headers: { "Accept-Encoding" => "identity" }
+      )
       .to_return(status: 200, body: "PDFDATA")
 
     client = described_class.new(base_url:, username: "u", password: "p")
 
     expect(client.attachments_for(tp_type: "UserStory", entity_id: 123, take: 2)).to eql([{ "Id" => 1, "Name" => "doc.pdf" }])
-    expect(client.download_attachment(1)).to eql("PDFDATA")
+    body = client.download_attachment(1)
+
+    expect(body).to eql("PDFDATA")
+    expect(body.encoding).to eql(Encoding::BINARY)
   end
 end
