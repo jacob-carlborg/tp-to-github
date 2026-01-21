@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+require_relative "../lib/tp_to_github"
+
+# Gather config from environment
+team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
+base_url = ENV.fetch("TP_BASE_URL", "")
+username = ENV.fetch("TP_USERNAME", "")
+password = ENV.fetch("TP_PASSWORD", "")
+repo = ENV.fetch("GITHUB_REPO")
+access_token = ENV.fetch("GITHUB_ACCESS_TOKEN")
+project_name = ENV["GITHUB_PROJECT_NAME"]
+dry_run = ENV["DRY_RUN"] == "1"
+idempotent = ENV.key?("IDEMPOTENT") ? ENV.fetch("IDEMPOTENT") : ENV.fetch("IDEMPOTEN", "1")
+
+client = TpToGithub::TargetProcessClient.new(base_url: base_url, username: username, password: password)
+stories = client.user_stories(team_id: team_id)
+story_ids = stories.map { |s| s["Id"] }
+
+if story_ids.empty?
+  puts "No stories found for team ##{team_id} (not Done)."
+  exit 0
+end
+
+puts "Found #{story_ids.size} eligible UserStories. Starting import..."
+
+success_count = 0
+fail_count = 0
+story_ids.each_with_index do |story_id, idx|
+  puts "\n===== Importing story ##{story_id} (#{idx+1}/#{story_ids.size}) ====="
+  # Prepare environment for subprocess
+  env = {
+    "TP_STORY_ID" => story_id.to_s,
+    "TP_BASE_URL" => base_url,
+    "TP_USERNAME" => username,
+    "TP_PASSWORD" => password,
+    "GITHUB_REPO" => repo,
+    "GITHUB_ACCESS_TOKEN" => access_token,
+    "TP_TEAM_ID" => team_id.to_s,
+    "DRY_RUN" => (dry_run ? "1" : nil),
+    "IDEMPOTENT" => idempotent
+  }.compact
+  # Run import script for each story
+  cmd = [File.join(__dir__, "tp_import_one_issue")]
+  begin
+    stdout, stderr, status = Open3.capture3(env, *cmd)
+    if status.success?
+      puts stdout
+      success_count += 1
+    else
+      warn "Error importing story ##{story_id}:\n#{stderr}\n#{stdout}"
+      fail_count += 1
+    end
+  rescue => e
+    warn "Subprocess exception story ##{story_id}: #{e.message}"
+    fail_count += 1
+  end
+end
+puts "\nImported #{success_count} stories successfully; #{fail_count} failed."
