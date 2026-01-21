@@ -4,6 +4,7 @@
 require "json"
 
 require_relative "../lib/tp_to_github"
+require_relative "../lib/tp_to_github/assignee_utils"
 
 dry_run = ENV["DRY_RUN"] == "1"
 # NOTE: historically this flag was named "IDEMPOTEN" (without the trailing T).
@@ -96,7 +97,7 @@ def tp_to_github_issue_type(tp_type)
   end
 end
 
-def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:, project_client: nil, project_node_id: nil, org: nil, repo: nil)
+def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issues:, plan_actions:, dry_run:, idempotent:, project_client: nil, project_node_id: nil, org: nil, repo: nil, assignees: nil)
   if idempotent
     existing = github.find_issue_by_marker(tp_type:, tp_id:)
 
@@ -107,10 +108,17 @@ def create_or_find_issue(github:, tp_type:, tp_id:, title:, body:, created_issue
   end
 
   plan_actions << { "create_issue" => title }
-  return { "number" => -1, "id" => -1, "html_url" => "" } if dry_run
+  if dry_run
+    plan_actions << { "assignees" => assignees } if assignees && tp_type == "UserStory"
+    return { "number" => -1, "id" => -1, "html_url" => "" }
+  end
 
   issue_type = tp_to_github_issue_type(tp_type)
-  created = github.create_issue(title: title, body: body, type: issue_type)
+  if tp_type == "UserStory"
+    created = github.create_issue(title: title, body: body, type: issue_type, assignees: assignees)
+  else
+    created = github.create_issue(title: title, body: body, type: issue_type)
+  end
   created_issues << created
 
   # Add to GitHub Project v2 if requested
@@ -190,7 +198,14 @@ begin
   plan_actions << { "add_sub_issue" => "Epic -> Feature" }
   github.add_sub_issue(parent_issue_number: epic_issue.fetch("number"), child_issue_id: feature_issue.fetch("id")) unless dry_run
 
-  story_issue = create_or_find_issue(
+  # --- Assignee mapping logic ---
+assignees_env_file = ENV["TP_TO_GITHUB_ASSIGNEE_MAPPING_FILE"]
+assignee_mapping = TpToGithub::AssigneeMapping.from_file(assignees_env_file)
+assignments = tp.assignments_for_user_story(story_id: story_id)
+tp_emails = assignments.map { |as| as.dig("GeneralUser", "Login") }.compact.uniq
+story_assignees = TpToGithub::AssigneeUtils.map_tp_emails_to_gh_usernames(tp_emails, assignee_mapping, warn_io: $stderr)
+
+story_issue = create_or_find_issue(
     github:,
     tp_type: "UserStory",
     tp_id: story_id,
@@ -203,7 +218,8 @@ begin
     project_client: project_client,
     project_node_id: project_node_id,
     org: org,
-    repo: repo
+    repo: repo,
+    assignees: story_assignees
   )
 
   # Set Estimate field from TP Effort (if present)

@@ -20,9 +20,10 @@ module TpToGithub
       validate!
     end
 
-    def create_issue(title:, body:, type: nil)
+    def create_issue(title:, body:, type: nil, assignees: nil)
       payload = { title: title, body: body }
       payload[:type] = type if type
+      payload[:assignees] = assignees if assignees && !assignees.empty?
       response = connection.post("/repos/#{@repo}/issues") do |req|
         req.body = JSON.generate(payload)
       end
