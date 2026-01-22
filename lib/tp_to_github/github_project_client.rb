@@ -81,17 +81,23 @@ module TpToGithub
           query($project: ID!) {
             node(id: $project) {
               ... on ProjectV2 {
-                fields(first: 50) {
-                  nodes {
-                    ... on ProjectV2FieldCommon {
-                      id
-                      name
-                    }
-                    ... on ProjectV2Field {
-                      dataType
-                    }
-                  }
-                }
+fields(first: 50) {
+      nodes {
+        ... on ProjectV2FieldCommon {
+          id
+          name
+        }
+        ... on ProjectV2Field {
+          dataType
+        }
+        ... on ProjectV2SingleSelectField {
+          options {
+            id
+            name
+          }
+        }
+      }
+    }
               }
             }
           }

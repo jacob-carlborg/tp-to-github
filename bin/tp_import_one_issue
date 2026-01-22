@@ -259,29 +259,31 @@ story_issue = create_or_find_issue(
   # --- Set Status field on project item for story ---
   entity_state_hash = story["EntityState"]
   tp_status = entity_state_hash.is_a?(Hash) ? entity_state_hash["Name"].to_s.strip : entity_state_hash.to_s.strip
-  STATUS_MAPPING = {
-    "Open" => "Todo",
-    "Specified" => "Todo",
-    "Estimated" => "Todo",
-    "Planned" => "Todo",
-    "In Progress" => "In progress",
-    "In Testing" => "In testing",
-    "Awaiting Release" => "Awaiting release",
-    "Done" => "Done",
-    "Code Review" => "Code review"
-  }
-  STATUS_OPTION_IDS = {
-    "Todo" => "f75ad846",
-    "In progress" => "47fc9ee4",
-    "Done" => "98236657",
-    "Code review" => "a4051e5a",
-    "In testing" => "0c22238e",
-    "Awaiting release" => "6b80231a"
-  }
-  github_status = STATUS_MAPPING[tp_status]
-  raise "Unknown or unmapped EntityState: #{tp_status.inspect}" unless github_status
-  option_id = STATUS_OPTION_IDS[github_status]
-  raise "No option ID for status #{github_status.inspect}" unless option_id
+   STATUS_MAPPING = {
+     "Open" => "Todo",
+     "Specified" => "Todo",
+     "Estimated" => "Todo",
+     "Planned" => "Todo",
+     "In Progress" => "In progress",
+     "In Testing" => "In testing",
+     "Awaiting Release" => "Awaiting release",
+     "Done" => "Done",
+     "Code Review" => "Code review"
+   }
+   # NOTE: Option IDs are no longer hardcoded. We query possible values dynamically.
+   github_status = STATUS_MAPPING[tp_status]
+   raise "Unknown or unmapped EntityState: #{tp_status.inspect}" unless github_status
+   # Build runtime mapping StatusName => ID from the actual project's fields
+   fields = project_client.project_fields(project_node_id: project_node_id)
+   status_field = fields.find { |f| f["name"] == "Status" }
+   unless status_field
+     raise "Project 'Status' field not found"
+   end
+   # Find the options array, which is present for single select fields
+   options = status_field["options"] || []
+   status_name_to_id = options.each_with_object({}) { |opt, h| h[opt["name"]]=opt["id"] }
+   option_id = status_name_to_id[github_status]
+   raise "No option ID for status '#{github_status}'. Available: #{status_name_to_id.keys.inspect}" unless option_id
 
   if project_client && project_node_id && org && repo
     repo_name = repo.split("/").last
@@ -300,8 +302,8 @@ story_issue = create_or_find_issue(
       raise "Project 'Status' field not found"
     end
     require 'pp'; pp status_field
-    # Use known option ID mapping for Status
-    project_client.set_status_field(project_node_id: project_node_id, item_id: item_id, field_id: status_field["id"], option_id: option_id)
+   # Use resolved (runtime) option_id by status name
+   project_client.set_status_field(project_node_id: project_node_id, item_id: item_id, field_id: status_field["id"], option_id: option_id)
     plan_actions << { "set_status_field" => github_status }
   end
 
