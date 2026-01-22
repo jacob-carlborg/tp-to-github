@@ -81,6 +81,53 @@ export TP_TEAM_ID=35411
 bin/tp_import_all_issues
 ```
 
+## GitHub Project Requirements
+
+Your GitHub Project (v2) must include:
+
+### Required Project Fields
+- **Status** (type: Single-select)
+  - Used to map TargetProcess EntityState to the GitHub issue's project status. 
+- **Estimate** (type: Number)
+  - Used to sync TargetProcess "Effort" field.
+
+### Required Status Values (Single-select Options)
+Your "Status" field must include these option names (case-sensitive):
+- Todo
+- In progress
+- Done
+- Code review
+- In testing
+- Awaiting release
+
+TP → GitHub status mapping:
+| TP Status         | GitHub Status       |
+|-------------------|--------------------|
+| Open              | Todo               |
+| Specified         | Todo               |
+| Estimated         | Todo               |
+| Planned           | Todo               |
+| In Progress       | In progress        |
+| In Testing        | In testing         |
+| Awaiting Release  | Awaiting release   |
+| Done              | Done               |
+| Code Review       | Code review        |
+
+If these values are missing, import will fail with an error listing available options.
+
+### Assignee Mapping
+If assigning GitHub users to issues, provide a mapping file referenced by `TP_TO_GITHUB_ASSIGNEE_MAPPING_FILE`:
+```
+user@company.com=ghusername
+alice@corp.com=aliceGH
+# Comments are supported
+```
+- All assignees to be mapped must appear in this file (TP email → GitHub username)
+- No dedicated "Role" field is required in GitHub; mapping occurs via usernames.
+
+### Estimate Field
+Your project must include a numeric "Estimate" field named "Estimate". If ambiguous or missing, import will fail.
+
 ## Notes
 - Attachments are uploaded as blobs in your repo under `tp_attachments/`
 - Dry run and idempotency modes are strongly recommended for production use!
