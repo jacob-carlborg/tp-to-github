@@ -21,7 +21,8 @@ Required for all imports:
 - `TP_USERNAME` / `TP_PASSWORD` — TargetProcess credentials
 - `GITHUB_REPO` — Destination repo, e.g., `myorg/projectrepo`
 - `GITHUB_ACCESS_TOKEN` — GitHub token with required repo/project permissions
-- `TP_TEAM_ID` — Team numeric ID (default: 35411)
+- `TP_TEAM_NAME` — (Recommended) TargetProcess team name (preferred if set)
+- `TP_TEAM_ID` — Team numeric ID (used if TP_TEAM_NAME unset)
 - `DRY_RUN` — set to `1` for dry-run (no API changes, plan output)
 - `IDEMPOTENT` — set to `0` to force re-import, otherwise imports only new items
 - `GITHUB_PROJECT_NAME` — Name of your GitHub Projects v2 (for field sync), optional
@@ -39,8 +40,13 @@ TP_BASE_URL="..." TP_USERNAME=... TP_PASSWORD=... GITHUB_REPO=... GITHUB_ACCESS_
 - This imports the specified UserStory and all its parents into GitHub, uploading checklists/attachments, and linking as sub-issues.
 
 ### Import All Stories for a Team
+With team name:
 ```
-TP_BASE_URL="..." TP_USERNAME=... TP_PASSWORD=... GITHUB_REPO=... GITHUB_ACCESS_TOKEN=... TP_TEAM_ID=35411 bin/tp_import_all_issues
+TP_BASE_URL="..." TP_USERNAME=... TP_PASSWORD=... GITHUB_REPO=... GITHUB_ACCESS_TOKEN=... TP_TEAM_NAME='My TP Team' bin/tp_import_all_issues
+```
+Or with team ID:
+```
+TP_TEAM_ID=12345 ... bin/tp_import_all_issues
 ```
 - Imports all user stories (and their parent chains) for the given team that are NOT Done.
 

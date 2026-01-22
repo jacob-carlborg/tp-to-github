@@ -138,6 +138,21 @@ module TpToGithub
       body.fetch("Items", [])
     end
 
+    def team_id_by_name(name)
+      response = connection.get("/api/v1/Teams") do |req|
+        req.params["where"] = "Name eq '#{name.gsub("'", "''")}'"
+        req.params["take"] = 2
+        req.params["select"] = "Id,Name"
+      end
+      body = JSON.parse(response.body)
+      teams = (body["Items"] || [])
+      raise "No TP team found with name: #{name}" if teams.empty?
+      if teams.size > 1
+        raise "More than one TP team found with name: #{name} (IDs: #{teams.map { |t| t["Id"] }.join(", ")})"
+      end
+      teams.first["Id"]
+    end
+
     private
     def select_fields
       "Id,Name,Description"

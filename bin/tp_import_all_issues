@@ -6,7 +6,17 @@ require "open3"
 require_relative "../lib/tp_to_github"
 
 # Gather config from environment
-team_id = Integer(ENV.fetch("TP_TEAM_ID", "35411"), 10)
+team_name = ENV["TP_TEAM_NAME"]
+if team_name && !team_name.strip.empty?
+  tp_team_lookup = TpToGithub::TargetProcessClient.new(base_url: ENV.fetch("TP_BASE_URL", ""), username: ENV.fetch("TP_USERNAME", ""), password: ENV.fetch("TP_PASSWORD", ""))
+  team_id = tp_team_lookup.team_id_by_name(team_name.strip)
+else
+  raw_id = ENV["TP_TEAM_ID"]
+  if raw_id.nil? || raw_id.strip.empty?
+    abort "ERROR: You must set either TP_TEAM_NAME or TP_TEAM_ID in the environment."
+  end
+  team_id = Integer(raw_id, 10)
+end
 base_url = ENV.fetch("TP_BASE_URL", "")
 username = ENV.fetch("TP_USERNAME", "")
 password = ENV.fetch("TP_PASSWORD", "")
